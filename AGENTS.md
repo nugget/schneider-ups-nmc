@@ -17,33 +17,34 @@ Everything below is what you need to contribute code.
 
 ## Build & Test
 
-All workflows go through [just](https://just.systems/). Prefer the project
-recipes over invoking underlying tools directly; the justfile keeps local
-validation aligned with GitHub Actions.
+All workflows go through [just](https://just.systems/). Run `just` for the
+grouped recipe list; the top of the `justfile` is an orientation guide for
+operators returning after a long gap. Prefer the project recipes over invoking
+underlying tools directly; the justfile keeps local validation aligned with
+GitHub Actions.
 
 ```bash
-just ci            # Full local gate
-just test          # Unit tests
-just lint          # Ruff lint
-just format        # Ruff format
-just format-check  # Ruff format check
-just doclint       # Pydoclint
-just typecheck     # Pyright
-just spellcheck    # Codespell
-just json          # Validate JSON manifests/translations/HACS metadata
-just yaml          # Validate GitHub Actions YAML
-just lock          # Update uv.lock
-just lock-check    # Verify uv.lock is current
-just release 0.1.0
-                   # Update release metadata, commit it, tag v0.1.0, push, and create the GitHub Release
-just release-prepare 0.1.0
-                   # Update release metadata and commit the release bump
-just release-publish 0.1.0
-                   # Tag v0.1.0, push, and create the GitHub Release from the current commit
+just setup         # Install the locked toolchain; check gh auth and signing
+just status        # Branch state, versions, latest release, open PRs
+just fix           # Ruff format and auto-fix lint findings
+just test          # Every test (unittest modules, then HA pytest modules)
+just test-ha -k x  # HA pytest tests with pytest arguments
+just test-unit     # Plain unittest tests (pass a module to narrow)
+just ci            # Full local gate, identical to GitHub Actions
+just ha-drift      # Compare pins and harness with the newest Home Assistant
+just ha-upgrade    # Move the test harness to the newest Home Assistant
+just release-prepare 0.2.1  # Gate, bump the version, open the release PR
+just release-publish 0.2.1  # After that PR merges: tag it, create the GitHub Release
 ```
 
 `just ci` must pass locally before every push. Do not rely on GitHub Actions to
-catch what could have been caught locally.
+catch what could have been caught locally. The individual checks it runs
+(`format-check`, `lint`, `doclint`, `typecheck`, `spellcheck`, `json`, `yaml`,
+`lock-check`) are also recipes.
+
+Release and Home Assistant helper logic lives in `scripts/`. It uses the
+standard library plus `packaging`, which Home Assistant already ships, and is
+held to the same lint, type, docstring and test gates as the integration.
 
 ## Code Conventions
 
@@ -178,13 +179,25 @@ incomplete.
   `v0.1.0-rc.1`.
 - Prefer GitHub releases for user-facing HACS installs and upgrades once the
   integration is ready for users.
-- `just release <version>` is the canonical release path. It writes the
-  non-prefixed Home Assistant manifest and Python project version, such as
-  `0.1.0`, into release metadata; refreshes `uv.lock`; runs the full local gate;
-  commits the release bump; creates a signed `v`-prefixed Git tag, such as
-  `v0.1.0`; pushes the commit and tag; and creates a GitHub Release so HACS can
-  see it as a release rather than only as a branch state. The recipes accept
-  either `0.1.0` or `v0.1.0` as input and normalize the two release surfaces.
+- Releases take two explicit steps because `main` only accepts signed commits
+  through reviewed PRs. Run both from a `main` that matches `origin/main`;
+  anywhere else they exit with the commands to get there.
+  `just release-prepare <version>` branches
+  `release/v<version>` from `origin/main`; writes the non-prefixed version,
+  such as `0.1.0`, into `manifest.json` and `pyproject.toml`; refreshes
+  `uv.lock`; runs the full local gate; and opens a `chore: release v<version>`
+  PR. If any step fails it rolls back to the operator's previous branch. After
+  the PR merges, `just release-publish <version>` finds the commit on
+  `origin/main` that set the version (not the tip of `main`), checks its GitHub
+  checks are green, pushes a signed `v`-prefixed tag such as `v0.1.0`, and
+  creates the GitHub Release so HACS sees it as a release. Each step refuses
+  with a pointer to the right one when run at the wrong time. Both accept
+  either `0.1.0` or `v0.1.0` and normalize the two release surfaces.
+- When Home Assistant ships a release, run `just ha-drift`. It exits non-zero
+  if a manifest requirement conflicts with core's pinned packages, which is a
+  setup failure for every user on that release. `just ha-upgrade` moves the
+  test harness forward; decide in the same PR whether the `hacs.json`
+  `homeassistant` minimum moves too.
 - Every release gets a narrative GitHub release-note pass after the automated
   release is created. Do not leave GitHub's generated "What's Changed" list as
   the final release copy. Start the body with exactly one top-level `#` heading
