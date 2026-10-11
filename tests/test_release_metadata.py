@@ -127,6 +127,22 @@ class CurrentVersionTest(unittest.TestCase):
                     release_metadata.current_version(ref, root=self.root), expected
                 )
 
+    def test_malformed_manifest_raises_release_error(self) -> None:
+        """Report a broken manifest cleanly instead of with a traceback."""
+        cases = (
+            ("invalid JSON", "{"),
+            ("no version", '{"domain": "schneider_ups_nmc"}'),
+            ("non-string version", '{"version": 2}'),
+            ("not an object", '["0.2.0"]'),
+        )
+        for name, manifest_text in cases:
+            with self.subTest(name):
+                self.manifest.write_text(manifest_text, encoding="utf-8")
+                with self.assertRaises(release_metadata.ReleaseMetadataError):
+                    release_metadata.current_version(root=self.root)
+                with self.assertRaises(release_metadata.ReleaseMetadataError):
+                    release_metadata.set_version("9.9.9", root=self.root)
+
     def test_unknown_ref_raises(self) -> None:
         """Report a ref that does not exist instead of crashing."""
         with self.assertRaises(release_metadata.ReleaseMetadataError):

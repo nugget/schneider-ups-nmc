@@ -266,6 +266,11 @@ release-publish version: _require-main
     set -euo pipefail
     version="$(uv run python scripts/release_metadata.py normalize '{{ version }}')"
     tag="v$version"
+    # Pre-releases (0.3.0-rc.1) must not become the release HACS installs.
+    kind="--latest"
+    if [[ "$version" == *-* ]]; then
+      kind="--prerelease"
+    fi
 
     git fetch --quiet origin main --tags
     on_main="$(uv run python scripts/release_metadata.py current origin/main)"
@@ -279,7 +284,7 @@ release-publish version: _require-main
         echo "$tag is already released: $url" >&2
       else
         echo "$tag is tagged but has no GitHub Release; create it with:" >&2
-        echo "  gh release create $tag --verify-tag --title $tag --generate-notes" >&2
+        echo "  gh release create $tag --verify-tag --title $tag --generate-notes $kind" >&2
       fi
       exit 1
     fi
@@ -320,11 +325,7 @@ release-publish version: _require-main
       echo "pushing $tag failed; removed the local tag so a rerun starts clean" >&2
       exit 1
     fi
-    if [[ "$version" == *-* ]]; then
-      gh release create "$tag" --verify-tag --title "$tag" --generate-notes --prerelease
-    else
-      gh release create "$tag" --verify-tag --title "$tag" --generate-notes --latest
-    fi
+    gh release create "$tag" --verify-tag --title "$tag" --generate-notes "$kind"
     echo
     echo "Next: replace the generated notes with a written summary (see AGENTS.md,"
     echo "\"HACS & Release Engineering\"): gh release edit $tag --notes-file notes.md"

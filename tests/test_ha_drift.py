@@ -15,16 +15,22 @@ NEWEST_CORE = "2026.11.0"
 CONSTRAINTS = """# Pinned by Home Assistant core
 cryptography==50.0.1
 aiohttp==3.13.0
+typing-extensions>=4.16.0,<5.0
 pycryptodome>=3.6.6
+pycryptodome!=3.20.0
 """
+RELEASES = {
+    "typing-extensions": ["3.10.0", "4.15.0", "4.16.0", "4.17.1", "5.0.0"],
+    "pycryptodome": ["3.5.0", "3.19.0", "3.20.0", "3.21.0"],
+}
 
 
 class RequirementStatusTest(unittest.TestCase):
     """Test how one manifest requirement compares with core."""
 
     def test_reports_each_requirement(self) -> None:
-        """Flag conflicts with core pins and drift from core's SNMP pin."""
-        pins = ha_drift._exact_pins(CONSTRAINTS)
+        """Flag conflicts with core pins and ranges, and drift from core's SNMP."""
+        constraints = ha_drift._core_constraints(CONSTRAINTS)
         core_snmp = {"pysnmp": "pysnmp==7.1.27"}
         cases = (
             (
@@ -32,28 +38,53 @@ class RequirementStatusTest(unittest.TestCase):
                 "CONFLICT: core pins 50.0.1",
                 True,
             ),
-            ("cryptography>=42.0.0", "ok, core pins 50.0.1", False),
+            ("cryptography>=42.0.0", "ok: core pins 50.0.1", False),
+            (
+                "typing-extensions<4",
+                "CONFLICT: no release satisfies core's <5.0,>=4.16.0",
+                True,
+            ),
+            (
+                "typing-extensions>=4.17,<4.18",
+                "ok: core requires <5.0,>=4.16.0",
+                False,
+            ),
+            (
+                "pycryptodome==3.20.0",
+                "CONFLICT: no release satisfies core's !=3.20.0,>=3.6.6",
+                True,
+            ),
+            ("pycryptodome>=3.19", "ok: core requires !=3.20.0,>=3.6.6", False),
             ("pysnmp==7.1.27", "matches core snmp integration", False),
             (
                 "pysnmp==7.1.26",
                 "differs from core snmp integration (pysnmp==7.1.27)",
                 False,
             ),
-            ("pycryptodome>=3.0", "not pinned by core", False),
-            ("somepackage==1.0", "not pinned by core", False),
+            ("somepackage==1.0", "not constrained by core", False),
         )
         for requirement, expected_status, expected_conflict in cases:
             with self.subTest(requirement):
                 self.assertEqual(
-                    ha_drift.requirement_status(requirement, pins, core_snmp),
+                    ha_drift.requirement_status(
+                        requirement, constraints, core_snmp, RELEASES.__getitem__
+                    ),
                     (expected_status, expected_conflict),
                 )
 
-    def test_exact_pins_ignore_comments_and_ranges(self) -> None:
-        """Only exact == pins constrain what an integration may require."""
+    def test_core_constraints_keep_ranges_and_merge_lines(self) -> None:
+        """Keep every core specifier and combine repeated packages."""
         self.assertEqual(
-            ha_drift._exact_pins(CONSTRAINTS),
-            {"cryptography": "50.0.1", "aiohttp": "3.13.0"},
+            {
+                name: str(specifier)
+                for name, specifier in ha_drift._core_constraints(CONSTRAINTS).items()
+            },
+            {
+                "cryptography": "==50.0.1",
+                "aiohttp": "==3.13.0",
+                "typing-extensions": "<5.0,>=4.16.0",
+                "pycryptodome": "!=3.20.0,>=3.6.6",
+            },
         )
 
 

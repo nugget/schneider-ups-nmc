@@ -75,7 +75,21 @@ def current_version(ref: str | None = None, root: Path = ROOT) -> str:
             msg = f"could not read {MANIFEST} at {ref}: {result.stderr.strip()}"
             raise ReleaseMetadataError(msg)
         text = result.stdout
-    return json.loads(text)["version"]
+    return _manifest_version(text, ref or "the working tree")
+
+
+def _manifest_version(text: str, where: str) -> str:
+    # Callers catch only ReleaseMetadataError, so a broken manifest must not
+    # surface as a traceback in the middle of a release.
+    try:
+        manifest_version = json.loads(text)["version"]
+    except (json.JSONDecodeError, KeyError, TypeError) as err:
+        msg = f"{MANIFEST} in {where} has no readable version: {err!r}"
+        raise ReleaseMetadataError(msg) from err
+    if not isinstance(manifest_version, str):
+        msg = f"{MANIFEST} in {where} has a non-string version: {manifest_version!r}"
+        raise ReleaseMetadataError(msg)
+    return manifest_version
 
 
 def set_version(version: str, root: Path = ROOT) -> None:
@@ -98,6 +112,7 @@ def set_version(version: str, root: Path = ROOT) -> None:
 
 
 def _render_manifest(text: str, version: str) -> str:
+    _manifest_version(text, "the working tree")
     manifest = json.loads(text)
     manifest["version"] = version
     return json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"

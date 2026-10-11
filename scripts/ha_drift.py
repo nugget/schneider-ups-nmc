@@ -21,11 +21,14 @@ import tomllib
 import urllib.request
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from packaging.requirements import Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.utils import canonicalize_name
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = "pytest-homeassistant-custom-component"
@@ -47,17 +50,30 @@ def _core_file(tag: str, path: str) -> str:
     return _fetch(CORE_RAW.format(tag=tag, path=path))
 
 
-def _exact_pins(constraints: str) -> dict[str, str]:
-    pins: dict[str, str] = {}
+def _core_constraints(constraints: str) -> dict[str, SpecifierSet]:
+    # Keep every specifier, not just exact pins: ranges such as
+    # typing-extensions>=4.16.0,<5.0 conflict just as hard, and a package may
+    # appear on more than one line.
+    merged: dict[str, SpecifierSet] = {}
     for line in constraints.splitlines():
         text = line.split("#", 1)[0].strip()
         if not text:
             continue
         requirement = Requirement(text)
-        specifiers = list(requirement.specifier)
-        if len(specifiers) == 1 and specifiers[0].operator == "==":
-            pins[canonicalize_name(requirement.name)] = specifiers[0].version
-    return pins
+        name = canonicalize_name(requirement.name)
+        merged[name] = merged.get(name, SpecifierSet()) & requirement.specifier
+    return merged
+
+
+def _exact_pin(specifier: SpecifierSet) -> str | None:
+    specifiers = list(specifier)
+    if len(specifiers) == 1 and specifiers[0].operator == "==":
+        return specifiers[0].version
+    return None
+
+
+def _releases(package: str) -> list[str]:
+    return list(_pypi(package)["releases"])
 
 
 def _harness_home_assistant(harness_release: str) -> str:
@@ -76,25 +92,41 @@ def _installed(package: str) -> str:
 
 
 def requirement_status(
-    text: str, core_pins: dict[str, str], core_snmp: dict[str, str]
+    text: str,
+    core_constraints: dict[str, SpecifierSet],
+    core_snmp: dict[str, str],
+    releases: Callable[[str], list[str]] = _releases,
 ) -> tuple[str, bool]:
     """Describe one manifest requirement against the newest core.
 
-    ``core_pins`` maps canonical package names to the exact versions in core's
-    ``package_constraints.txt``; ``core_snmp`` maps them to the requirement
-    strings in core's SNMP integration manifest. Returns the report text and
-    whether the requirement would stop the integration from loading.
+    ``core_constraints`` maps canonical package names to the combined
+    specifiers in core's ``package_constraints.txt``; ``core_snmp`` maps them
+    to the requirement strings in core's SNMP integration manifest. An exact
+    core pin is checked directly. A core range conflicts when no published
+    release, from ``releases(name)``, satisfies both it and our requirement.
+    Returns the report text and whether the requirement would stop the
+    integration from loading.
     """
     requirement = Requirement(text)
     name = canonicalize_name(requirement.name)
     notes: list[str] = []
     conflict = False
-    pinned = core_pins.get(name)
-    if pinned and not requirement.specifier.contains(pinned, prereleases=True):
-        notes.append(f"CONFLICT: core pins {pinned}")
-        conflict = True
-    elif pinned:
-        notes.append(f"ok, core pins {pinned}")
+    core_specifier = core_constraints.get(name)
+    if core_specifier is not None:
+        pinned = _exact_pin(core_specifier)
+        if pinned is not None:
+            conflict = not requirement.specifier.contains(pinned, prereleases=True)
+            notes.append(f"{'CONFLICT' if conflict else 'ok'}: core pins {pinned}")
+        else:
+            both = core_specifier & requirement.specifier
+            conflict = not any(
+                both.contains(release, prereleases=True) for release in releases(name)
+            )
+            notes.append(
+                f"CONFLICT: no release satisfies core's {core_specifier}"
+                if conflict
+                else f"ok: core requires {core_specifier}"
+            )
     core_text = core_snmp.get(name)
     if core_text and SpecifierSet(str(Requirement(core_text).specifier)) != (
         requirement.specifier
@@ -102,7 +134,7 @@ def requirement_status(
         notes.append(f"differs from core snmp integration ({core_text})")
     elif core_text:
         notes.append("matches core snmp integration")
-    return "; ".join(notes) or "not pinned by core", conflict
+    return "; ".join(notes) or "not constrained by core", conflict
 
 
 def main() -> int:
@@ -120,7 +152,9 @@ def main() -> int:
     latest_harness = _pypi(HARNESS)["info"]["version"]
     latest_harness_core = _harness_home_assistant(latest_harness)
     installed_harness = _installed(HARNESS)
-    pins = _exact_pins(_core_file(latest_core, "homeassistant/package_constraints.txt"))
+    constraints = _core_constraints(
+        _core_file(latest_core, "homeassistant/package_constraints.txt")
+    )
     snmp_manifest = json.loads(
         _core_file(latest_core, "homeassistant/components/snmp/manifest.json")
     )
@@ -147,7 +181,7 @@ def main() -> int:
     conflicts = 0
     print("\nManifest requirements vs newest core")
     for text in manifest["requirements"]:
-        status, conflict = requirement_status(text, pins, core_snmp)
+        status, conflict = requirement_status(text, constraints, core_snmp)
         conflicts += conflict
         print(f"  {text:<48} {status}")
 
