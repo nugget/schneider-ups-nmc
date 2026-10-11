@@ -13,7 +13,7 @@ from .syslog import SYSLOG_EVENT_TYPES, RoutedSyslogEvent, syslog_event_state_da
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
-    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
     from . import SchneiderUPSNMCConfigEntry
     from .coordinator import SchneiderUPSNMCCoordinator
@@ -29,7 +29,7 @@ SYSLOG_EVENT_DESCRIPTION = EventEntityDescription(
 async def async_setup_entry(
     _hass: HomeAssistant,
     entry: SchneiderUPSNMCConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up APC UPS NMC event entities."""
     coordinator: SchneiderUPSNMCCoordinator = entry.runtime_data

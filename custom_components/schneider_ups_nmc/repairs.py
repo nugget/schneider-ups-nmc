@@ -5,8 +5,8 @@ from __future__ import annotations
 from ipaddress import ip_address
 from typing import TYPE_CHECKING, Any
 
-import voluptuous as vol
-from homeassistant.components.repairs import RepairsFlow
+import probatio
+from homeassistant.components.repairs import RepairsFlow, RepairsFlowResult
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -27,7 +27,6 @@ from .syslog import (
 )
 
 if TYPE_CHECKING:
-    from homeassistant import data_entry_flow
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
@@ -45,14 +44,14 @@ class SyslogListenerRepairFlow(RepairsFlow):
     async def async_step_init(
         self,
         _user_input: dict[str, Any] | None = None,
-    ) -> data_entry_flow.FlowResult:
+    ) -> RepairsFlowResult:
         """Handle the initial step."""
         return await self.async_step_syslog_options()
 
     async def async_step_syslog_options(
         self,
         user_input: dict[str, Any] | None = None,
-    ) -> data_entry_flow.FlowResult:
+    ) -> RepairsFlowResult:
         """Handle syslog listener option changes."""
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -93,14 +92,14 @@ class SyslogParseFailureRepairFlow(RepairsFlow):
     async def async_step_init(
         self,
         _user_input: dict[str, Any] | None = None,
-    ) -> data_entry_flow.FlowResult:
+    ) -> RepairsFlowResult:
         """Handle the initial step."""
         return await self.async_step_confirm_disable()
 
     async def async_step_confirm_disable(
         self,
         user_input: dict[str, Any] | None = None,
-    ) -> data_entry_flow.FlowResult:
+    ) -> RepairsFlowResult:
         """Disable syslog for the affected entry when confirmed."""
         if user_input is not None:
             options = dict(self.entry.options)
@@ -111,7 +110,7 @@ class SyslogParseFailureRepairFlow(RepairsFlow):
 
         return self.async_show_form(
             step_id="confirm_disable",
-            data_schema=vol.Schema({}),
+            data_schema=probatio.Schema({}),
             description_placeholders=self.placeholders,
         )
 
@@ -167,26 +166,26 @@ def _placeholders(data: IssueData) -> dict[str, str]:
 def _syslog_options_schema(
     entry: ConfigEntry,
     user_input: dict[str, Any] | None,
-) -> vol.Schema:
+) -> probatio.Schema:
     """Return the syslog listener repair option schema."""
     defaults = dict(entry.data) | dict(entry.options)
     if user_input is not None:
         defaults |= user_input
 
-    return vol.Schema(
+    return probatio.Schema(
         {
-            vol.Required(
+            probatio.Required(
                 CONF_SYSLOG_ENABLED,
                 default=defaults.get(CONF_SYSLOG_ENABLED, DEFAULT_SYSLOG_ENABLED),
             ): bool,
-            vol.Required(
+            probatio.Required(
                 CONF_SYSLOG_BIND_ADDRESS,
                 default=defaults.get(
                     CONF_SYSLOG_BIND_ADDRESS,
                     DEFAULT_SYSLOG_BIND_ADDRESS,
                 ),
             ): str,
-            vol.Required(
+            probatio.Required(
                 CONF_SYSLOG_PORT,
                 default=defaults.get(CONF_SYSLOG_PORT, DEFAULT_SYSLOG_PORT),
             ): NumberSelector(

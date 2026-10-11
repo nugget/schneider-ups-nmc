@@ -224,8 +224,8 @@ async def test_config_entry_sets_up_entities_and_unloads(
     assert state is not None
     assert state.state == "97"
 
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, ENTRY_UNIQUE_ID)}
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, ENTRY_UNIQUE_ID), entry.entry_id
     )
     assert device is not None
     assert device.configuration_url == "http://192.0.2.10"
@@ -441,8 +441,8 @@ async def test_config_entry_uses_explicit_web_url(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    device = dr.async_get(hass).async_get_device(
-        identifiers={(DOMAIN, ENTRY_UNIQUE_ID)}
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, ENTRY_UNIQUE_ID), entry.entry_id
     )
     assert device is not None
     assert device.configuration_url == "https://ups.example.test:8443/status"

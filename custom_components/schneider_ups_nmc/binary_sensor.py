@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
 
 from .entity import SchneiderUPSNMCEntity
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from homeassistant.core import HomeAssistant
-    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+    from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
     from . import SchneiderUPSNMCConfigEntry
     from .coordinator import SchneiderUPSNMCCoordinator
@@ -104,7 +104,7 @@ BINARY_SENSOR_DESCRIPTIONS: tuple[SchneiderUPSNMCBinarySensorEntityDescription, 
 async def async_setup_entry(
     _hass: HomeAssistant,
     entry: SchneiderUPSNMCConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up APC UPS NMC binary sensors."""
     coordinator: SchneiderUPSNMCCoordinator = entry.runtime_data
