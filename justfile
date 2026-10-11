@@ -14,8 +14,13 @@
 # `main` only accepts signed commits through reviewed PRs, and `just ci` is the
 # same gate GitHub Actions runs, so run it before every push.
 #
-# Shipping a release: `just release 0.2.1`, merge the PR it opens, run
-# `just release 0.2.1` again, then rewrite the GitHub release notes.
+# Shipping a release takes two steps, because main only accepts reviewed PRs:
+#
+#   just release-prepare 0.2.1   gate, bump the version, open the release PR
+#   (get the PR reviewed and merged)
+#   just release-publish 0.2.1   tag the release commit, create the GitHub Release
+#
+# Then replace the generated GitHub release notes with a written summary.
 #
 # AGENTS.md has the full conventions; README.md has the user-facing docs.
 
@@ -185,22 +190,7 @@ lock:
 
 # --- Releases ----------------------------------------------------------------
 
-# The first run opens the version-bump PR (main only takes reviewed PRs);
-# after that PR merges, the second run tags and publishes.
-[doc('Ship VERSION (0.2.1 or v0.2.1). Run once to open the PR, again after merge.')]
-[group('release')]
-release version:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    version="$(uv run python scripts/release_metadata.py normalize '{{ version }}')"
-    git fetch --quiet origin main --tags
-    if [[ "$(uv run python scripts/release_metadata.py current origin/main)" == "$version" ]]; then
-      just release-publish "$version"
-    else
-      just release-prepare "$version"
-    fi
-
-# Step 1: open a PR that bumps manifest.json, pyproject.toml and uv.lock.
+# Step 1 of 2: run the gate and open a PR bumping the version to VERSION.
 [group('release')]
 release-prepare version:
     #!/usr/bin/env bash
@@ -226,7 +216,7 @@ release-prepare version:
     open_pr="$(gh pr list --head "$branch" --state open --json url -q '.[0].url')"
     if [[ -n "$open_pr" ]]; then
       echo "the $tag release PR is already open: $open_pr"
-      echo "after it merges, run: just release $version"
+      echo "after it merges, run: just release-publish $version"
       exit 0
     fi
     if git rev-parse -q --verify "refs/heads/$branch" >/dev/null; then
@@ -261,13 +251,13 @@ release-prepare version:
     gh pr create --base main --head "$branch" --title "chore: release $tag" \
       --body "Bumps the release version to \`$version\` in \`manifest.json\`, \`pyproject.toml\` and \`uv.lock\`.
 
-    After this merges, run \`just release $version\` to tag the release commit and create the GitHub Release."
+    After this merges, run \`just release-publish $version\` to tag the release commit and create the GitHub Release."
     trap - ERR
     git switch --quiet -
     echo
-    echo "Next: get the PR reviewed and merged, then run: just release $version"
+    echo "Next: get the PR reviewed and merged, then run: just release-publish $version"
 
-# Step 2: tag the merged release commit and create the GitHub Release.
+# Step 2 of 2, after the release PR merges: tag it and create the GitHub Release.
 [group('release')]
 release-publish version:
     #!/usr/bin/env bash
@@ -278,7 +268,7 @@ release-publish version:
     git fetch --quiet origin main --tags
     on_main="$(uv run python scripts/release_metadata.py current origin/main)"
     if [[ "$on_main" != "$version" ]]; then
-      echo "origin/main is at $on_main, not $version; merge the release PR first (just release $version)" >&2
+      echo "origin/main is at $on_main, not $version. Run 'just release-prepare $version' and merge its PR first." >&2
       exit 1
     fi
     if git rev-parse -q --verify "refs/tags/$tag" >/dev/null \

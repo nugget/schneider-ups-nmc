@@ -33,7 +33,8 @@ just test-unit     # Plain unittest tests (pass a module to narrow)
 just ci            # Full local gate, identical to GitHub Actions
 just ha-drift      # Compare pins and harness with the newest Home Assistant
 just ha-upgrade    # Move the test harness to the newest Home Assistant
-just release 0.2.1 # Run once to open the bump PR, again after it merges
+just release-prepare 0.2.1  # Gate, bump the version, open the release PR
+just release-publish 0.2.1  # After that PR merges: tag it, create the GitHub Release
 ```
 
 `just ci` must pass locally before every push. Do not rely on GitHub Actions to
@@ -178,19 +179,18 @@ incomplete.
   `v0.1.0-rc.1`.
 - Prefer GitHub releases for user-facing HACS installs and upgrades once the
   integration is ready for users.
-- `just release <version>` is the canonical release path, and it runs twice
-  because `main` only accepts signed commits through reviewed PRs. The first
-  run branches `release/v<version>` from `origin/main`; writes the non-prefixed
-  version, such as `0.1.0`, into `manifest.json` and `pyproject.toml`;
-  refreshes `uv.lock`; runs the full local gate; and opens a
-  `chore: release v<version>` PR. If any step fails it rolls back to the
-  operator's previous branch. After the PR merges, the second run finds the
-  commit on `origin/main` that set the version (not the tip of `main`), checks
-  its GitHub checks are green, pushes a signed `v`-prefixed tag such as
-  `v0.1.0`, and creates the GitHub Release so HACS sees it as a release.
-  `release-prepare` and `release-publish` run the two halves directly. The
-  recipes accept either `0.1.0` or `v0.1.0` and normalize the two release
-  surfaces.
+- Releases take two explicit steps because `main` only accepts signed commits
+  through reviewed PRs. `just release-prepare <version>` branches
+  `release/v<version>` from `origin/main`; writes the non-prefixed version,
+  such as `0.1.0`, into `manifest.json` and `pyproject.toml`; refreshes
+  `uv.lock`; runs the full local gate; and opens a `chore: release v<version>`
+  PR. If any step fails it rolls back to the operator's previous branch. After
+  the PR merges, `just release-publish <version>` finds the commit on
+  `origin/main` that set the version (not the tip of `main`), checks its GitHub
+  checks are green, pushes a signed `v`-prefixed tag such as `v0.1.0`, and
+  creates the GitHub Release so HACS sees it as a release. Each step refuses
+  with a pointer to the right one when run at the wrong time. Both accept
+  either `0.1.0` or `v0.1.0` and normalize the two release surfaces.
 - When Home Assistant ships a release, run `just ha-drift`. It exits non-zero
   if a manifest requirement conflicts with core's pinned packages, which is a
   setup failure for every user on that release. `just ha-upgrade` moves the
