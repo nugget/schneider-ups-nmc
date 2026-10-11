@@ -114,11 +114,8 @@ def _lock_package() -> dict[str, Any]:
     raise AssertionError(f"{PACKAGE_NAME} is missing from uv.lock")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 def _home_assistant_pins() -> dict[str, str]:
+    """Return the exact package pins from Home Assistant's package_constraints.txt."""
     constraints_path = Path(homeassistant.__file__).with_name("package_constraints.txt")
     pins: dict[str, str] = {}
     for line in constraints_path.read_text(encoding="utf-8").splitlines():
@@ -130,3 +127,7 @@ def _home_assistant_pins() -> dict[str, str]:
         if len(specifiers) == 1 and specifiers[0].operator == "==":
             pins[canonicalize_name(requirement.name)] = specifiers[0].version
     return pins
+
+
+if __name__ == "__main__":
+    unittest.main()
