@@ -1,0 +1,3 @@
+# Request a review from the maintainer on every pull request.
+# Keep in sync with "codeowners" in custom_components/schneider_ups_nmc/manifest.json.
+* @nugget
