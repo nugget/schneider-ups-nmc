@@ -75,6 +75,36 @@ def _installed(package: str) -> str:
         return "not installed (run `just setup`)"
 
 
+def requirement_status(
+    text: str, core_pins: dict[str, str], core_snmp: dict[str, str]
+) -> tuple[str, bool]:
+    """Describe one manifest requirement against the newest core.
+
+    ``core_pins`` maps canonical package names to the exact versions in core's
+    ``package_constraints.txt``; ``core_snmp`` maps them to the requirement
+    strings in core's SNMP integration manifest. Returns the report text and
+    whether the requirement would stop the integration from loading.
+    """
+    requirement = Requirement(text)
+    name = canonicalize_name(requirement.name)
+    notes: list[str] = []
+    conflict = False
+    pinned = core_pins.get(name)
+    if pinned and not requirement.specifier.contains(pinned, prereleases=True):
+        notes.append(f"CONFLICT: core pins {pinned}")
+        conflict = True
+    elif pinned:
+        notes.append(f"ok, core pins {pinned}")
+    core_text = core_snmp.get(name)
+    if core_text and SpecifierSet(str(Requirement(core_text).specifier)) != (
+        requirement.specifier
+    ):
+        notes.append(f"differs from core snmp integration ({core_text})")
+    elif core_text:
+        notes.append("matches core snmp integration")
+    return "; ".join(notes) or "not pinned by core", conflict
+
+
 def main() -> int:
     """Print the drift report; return 1 if a requirement blocks setup."""
     manifest = json.loads(
@@ -89,11 +119,12 @@ def main() -> int:
     latest_core = core["version"]
     latest_harness = _pypi(HARNESS)["info"]["version"]
     latest_harness_core = _harness_home_assistant(latest_harness)
+    installed_harness = _installed(HARNESS)
     pins = _exact_pins(_core_file(latest_core, "homeassistant/package_constraints.txt"))
     snmp_manifest = json.loads(
         _core_file(latest_core, "homeassistant/components/snmp/manifest.json")
     )
-    core_requirements = {
+    core_snmp: dict[str, str] = {
         canonicalize_name(Requirement(text).name): text
         for text in snmp_manifest["requirements"]
     }
@@ -101,35 +132,24 @@ def main() -> int:
     print("Home Assistant")
     rows = [
         ("newest release", latest_core),
-        ("harness runs", _installed("homeassistant")),
+        (
+            f"installed {HARNESS}",
+            f"{installed_harness} (HA {_installed('homeassistant')})",
+        ),
         (f"newest {HARNESS}", f"{latest_harness} (HA {latest_harness_core})"),
         ("hacs.json minimum", hacs.get("homeassistant", "not set")),
         ("newest core needs Python", core["requires_python"]),
         ("we declare Python", pyproject["project"]["requires-python"]),
     ]
     for label, value in rows:
-        print(f"  {label:<44} {value}")
+        print(f"  {label:<48} {value}")
 
     conflicts = 0
     print("\nManifest requirements vs newest core")
     for text in manifest["requirements"]:
-        requirement = Requirement(text)
-        name = canonicalize_name(requirement.name)
-        notes: list[str] = []
-        pinned = pins.get(name)
-        if pinned and not requirement.specifier.contains(pinned, prereleases=True):
-            notes.append(f"CONFLICT: core pins {pinned}")
-            conflicts += 1
-        elif pinned:
-            notes.append(f"ok, core pins {pinned}")
-        core_text = core_requirements.get(name)
-        if core_text and SpecifierSet(str(Requirement(core_text).specifier)) != (
-            requirement.specifier
-        ):
-            notes.append(f"differs from core snmp integration ({core_text})")
-        elif core_text:
-            notes.append("matches core snmp integration")
-        print(f"  {text:<44} {'; '.join(notes) or 'not pinned by core'}")
+        status, conflict = requirement_status(text, pins, core_snmp)
+        conflicts += conflict
+        print(f"  {text:<48} {status}")
 
     if conflicts:
         print(
@@ -137,10 +157,10 @@ def main() -> int:
             "Fix the requirement, then `just ha-upgrade` and `just ci`."
         )
         return 1
-    if _installed("homeassistant") != latest_harness_core:
+    if installed_harness != latest_harness:
         print(
-            "\nThe harness is behind the newest harness release. "
-            "Run `just ha-upgrade` to test against it."
+            f"\nThe installed harness ({installed_harness}) is behind the newest "
+            f"release ({latest_harness}). Run `just ha-upgrade` to test against it."
         )
     return 0
 

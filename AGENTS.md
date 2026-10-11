@@ -42,9 +42,9 @@ catch what could have been caught locally. The individual checks it runs
 (`format-check`, `lint`, `doclint`, `typecheck`, `spellcheck`, `json`, `yaml`,
 `lock-check`) are also recipes.
 
-Release and Home Assistant helper logic lives in `scripts/`, standard library
-only, and is held to the same lint, type and docstring gates as the
-integration.
+Release and Home Assistant helper logic lives in `scripts/`. It uses the
+standard library plus `packaging`, which Home Assistant already ships, and is
+held to the same lint, type, docstring and test gates as the integration.
 
 ## Code Conventions
 

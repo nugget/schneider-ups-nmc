@@ -245,7 +245,9 @@ release-prepare version:
     uv lock
     just ci
     git add {{ manifest }} pyproject.toml uv.lock
-    git commit --quiet -m "chore: release $tag"
+    # main rejects unsigned commits; sign explicitly so a missing signing
+    # setup fails here and rolls back instead of producing an unmergeable PR.
+    git commit --quiet -S -m "chore: release $tag"
     git push --quiet -u origin "$branch"
     pushed=1
     gh pr create --base main --head "$branch" --title "chore: release $tag" \
@@ -297,15 +299,27 @@ release-publish version:
       exit 1
     fi
 
-    unfinished="$(gh api "repos/{owner}/{repo}/commits/$commit/check-runs" \
-      --jq '[.check_runs[] | select(.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral") | .name] | join(", ")')"
+    # Right after a merge, CI may not have registered any runs yet; no runs
+    # is not the same as green, so wait for at least one.
+    checks="$(gh api "repos/{owner}/{repo}/commits/$commit/check-runs" \
+      --jq '"\(.total_count)\t" + ([.check_runs[] | select(.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral") | .name] | join(", "))')"
+    total="${checks%%$'\t'*}"
+    unfinished="${checks#*$'\t'}"
+    if [[ "$total" == 0 ]]; then
+      echo "no checks have reported on $(git rev-parse --short "$commit") yet; wait for CI and rerun" >&2
+      exit 1
+    fi
     if [[ -n "$unfinished" ]]; then
       echo "checks on $(git rev-parse --short "$commit") are not green yet: $unfinished" >&2
       exit 1
     fi
 
     git tag -s "$tag" "$commit" -m "$tag"
-    git push --quiet origin "refs/tags/$tag"
+    if ! git push --quiet origin "refs/tags/$tag"; then
+      git tag -d "$tag" >/dev/null
+      echo "pushing $tag failed; removed the local tag so a rerun starts clean" >&2
+      exit 1
+    fi
     if [[ "$version" == *-* ]]; then
       gh release create "$tag" --verify-tag --title "$tag" --generate-notes --prerelease
     else

@@ -56,17 +56,17 @@ def normalize_version(version: str) -> str:
     return normalized
 
 
-def current_version(ref: str | None = None) -> str:
+def current_version(ref: str | None = None, root: Path = ROOT) -> str:
     """Return the manifest version in the working tree, or at git ``ref``.
 
     Raises ``ReleaseMetadataError`` when ``ref`` or its manifest cannot be read.
     """
     if ref is None:
-        text = ROOT.joinpath(MANIFEST).read_text(encoding="utf-8")
+        text = root.joinpath(MANIFEST).read_text(encoding="utf-8")
     else:
         result = subprocess.run(
             ["git", "show", f"{ref}:{MANIFEST.as_posix()}"],
-            cwd=ROOT,
+            cwd=root,
             capture_output=True,
             check=False,
             text=True,
@@ -78,24 +78,37 @@ def current_version(ref: str | None = None) -> str:
     return json.loads(text)["version"]
 
 
-def set_version(version: str) -> None:
+def set_version(version: str, root: Path = ROOT) -> None:
     """Write ``version`` into ``manifest.json`` and ``pyproject.toml``.
 
-    ``pyproject.toml`` is edited in place on its ``[project]`` version line so
-    comments and formatting elsewhere in the file survive. Raises
-    ``ReleaseMetadataError`` when there is no single editable version line.
+    Both files are validated and rendered before either is written, so a
+    malformed ``pyproject.toml`` leaves the manifest untouched too. The
+    ``[project]`` version line is edited in place so comments and formatting
+    elsewhere survive. Raises ``ReleaseMetadataError`` when there is no single
+    editable version line.
     """
-    manifest_path = ROOT.joinpath(MANIFEST)
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["version"] = version
-    manifest_path.write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
+    manifest_path = root.joinpath(MANIFEST)
+    pyproject_path = root.joinpath(PYPROJECT)
+    manifest_text = _render_manifest(manifest_path.read_text(encoding="utf-8"), version)
+    pyproject_text = _render_pyproject(
+        pyproject_path.read_text(encoding="utf-8"), version
     )
+    manifest_path.write_text(manifest_text, encoding="utf-8")
+    pyproject_path.write_text(pyproject_text, encoding="utf-8")
 
-    pyproject_path = ROOT.joinpath(PYPROJECT)
-    text = pyproject_path.read_text(encoding="utf-8")
-    parsed_version = tomllib.loads(text)["project"]["version"]
+
+def _render_manifest(text: str, version: str) -> str:
+    manifest = json.loads(text)
+    manifest["version"] = version
+    return json.dumps(manifest, ensure_ascii=False, indent=2) + "\n"
+
+
+def _render_pyproject(text: str, version: str) -> str:
+    try:
+        parsed_version = tomllib.loads(text)["project"]["version"]
+    except (tomllib.TOMLDecodeError, KeyError) as err:
+        msg = f"pyproject.toml has no readable [project] version: {err}"
+        raise ReleaseMetadataError(msg) from err
     section = _PROJECT_SECTION.search(text)
     if section is None:
         msg = "pyproject.toml is missing a [project] section"
@@ -117,10 +130,7 @@ def set_version(version: str) -> None:
         + f"{line.group('prefix')}{quote}{version}{quote}{line.group('suffix')}"
         + body[line.end() :]
     )
-    pyproject_path.write_text(
-        text[: section.start("body")] + updated_body + text[section.end("body") :],
-        encoding="utf-8",
-    )
+    return text[: section.start("body")] + updated_body + text[section.end("body") :]
 
 
 def main(argv: list[str] | None = None) -> int:
