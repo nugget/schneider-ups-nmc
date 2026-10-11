@@ -19,6 +19,7 @@ from .const import (
     CONF_PRIVACY_KEY,
     CONF_PRIVACY_PROTOCOL,
     CONF_SNMP_VERSION,
+    CONF_SYSLOG_LOG_RAW_MESSAGES,
     CONF_USERNAME,
     CONF_WEB_URL,
     DEFAULT_PORT,
@@ -63,6 +64,12 @@ class SchneiderUPSNMCCoordinator(DataUpdateCoordinator[UPSData]):
         )
         self.host = entry.data[CONF_HOST]
         self.web_url = entry.options.get(CONF_WEB_URL, entry.data.get(CONF_WEB_URL))
+        self.syslog_log_raw_messages = bool(
+            entry.options.get(
+                CONF_SYSLOG_LOG_RAW_MESSAGES,
+                entry.data.get(CONF_SYSLOG_LOG_RAW_MESSAGES, False),
+            )
+        )
         self._last_syslog_event: RoutedSyslogEvent | None = None
         self._last_syslog_event_received_at: datetime | None = None
         self.last_syslog_parse_failure: RoutedSyslogParseFailure | None = None

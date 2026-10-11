@@ -31,6 +31,7 @@ from .const import (
     CONF_SNMP_VERSION,
     CONF_SYSLOG_BIND_ADDRESS,
     CONF_SYSLOG_ENABLED,
+    CONF_SYSLOG_LOG_RAW_MESSAGES,
     CONF_SYSLOG_PORT,
     CONF_USERNAME,
     CONF_WEB_URL,
@@ -57,6 +58,7 @@ from .snmp import (
 from .syslog import (
     DEFAULT_SYSLOG_BIND_ADDRESS,
     DEFAULT_SYSLOG_ENABLED,
+    DEFAULT_SYSLOG_LOG_RAW_MESSAGES,
     DEFAULT_SYSLOG_PORT,
 )
 from .web_url import normalize_web_url as _normalize_web_url
@@ -299,6 +301,10 @@ class SchneiderUPSNMCOptionsFlow(config_entries.OptionsFlow):
             DEFAULT_SYSLOG_BIND_ADDRESS,
         )
         syslog_port = defaults.get(CONF_SYSLOG_PORT, DEFAULT_SYSLOG_PORT)
+        syslog_log_raw_messages = defaults.get(
+            CONF_SYSLOG_LOG_RAW_MESSAGES,
+            DEFAULT_SYSLOG_LOG_RAW_MESSAGES,
+        )
 
         return self.async_show_form(
             step_id="init",
@@ -329,6 +335,10 @@ class SchneiderUPSNMCOptionsFlow(config_entries.OptionsFlow):
                             mode=NumberSelectorMode.BOX,
                         )
                     ),
+                    vol.Required(
+                        CONF_SYSLOG_LOG_RAW_MESSAGES,
+                        default=syslog_log_raw_messages,
+                    ): bool,
                     _optional_web_url(defaults): _url_selector(),
                 }
             ),

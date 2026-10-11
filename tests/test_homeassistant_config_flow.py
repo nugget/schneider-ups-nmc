@@ -24,6 +24,7 @@ from custom_components.schneider_ups_nmc.const import (
     CONF_SNMP_VERSION,
     CONF_SYSLOG_BIND_ADDRESS,
     CONF_SYSLOG_ENABLED,
+    CONF_SYSLOG_LOG_RAW_MESSAGES,
     CONF_SYSLOG_PORT,
     CONF_USERNAME,
     CONF_WEB_URL,
@@ -374,6 +375,7 @@ async def test_options_flow_saves_polling_and_syslog_options(
             CONF_SYSLOG_ENABLED: False,
             CONF_SYSLOG_BIND_ADDRESS: " 127.0.0.1 ",
             CONF_SYSLOG_PORT: 1515,
+            CONF_SYSLOG_LOG_RAW_MESSAGES: True,
             CONF_WEB_URL: " https://ups.example.test:8443 ",
         },
     )
@@ -384,6 +386,7 @@ async def test_options_flow_saves_polling_and_syslog_options(
         CONF_SYSLOG_ENABLED: False,
         CONF_SYSLOG_BIND_ADDRESS: "127.0.0.1",
         CONF_SYSLOG_PORT: 1515,
+        CONF_SYSLOG_LOG_RAW_MESSAGES: True,
         CONF_WEB_URL: "https://ups.example.test:8443",
     }
 
