@@ -333,7 +333,7 @@ class SchneiderUPSNMCOptionsFlow(config_entries.OptionsFlow):
                             mode=NumberSelectorMode.BOX,
                         )
                     ),
-                    vol.Required(
+                    probatio.Required(
                         CONF_SYSLOG_LOG_RAW_MESSAGES,
                         default=syslog_log_raw_messages,
                     ): bool,
