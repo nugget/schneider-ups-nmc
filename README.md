@@ -42,7 +42,7 @@ matches what the card actually reports.
 
 ## Requirements
 
-- Home Assistant with HACS installed.
+- Home Assistant 2026.10.0 or newer with HACS installed.
 - An APC by Schneider Electric UPS with a supported Network Management Card.
 - SNMP enabled on the NMC web or CLI interface.
 - Either SNMPv2c read-only community access or SNMPv3 credentials.
