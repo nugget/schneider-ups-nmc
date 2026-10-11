@@ -180,7 +180,9 @@ incomplete.
 - Prefer GitHub releases for user-facing HACS installs and upgrades once the
   integration is ready for users.
 - Releases take two explicit steps because `main` only accepts signed commits
-  through reviewed PRs. `just release-prepare <version>` branches
+  through reviewed PRs. Run both from a `main` that matches `origin/main`;
+  anywhere else they exit with the commands to get there.
+  `just release-prepare <version>` branches
   `release/v<version>` from `origin/main`; writes the non-prefixed version,
   such as `0.1.0`, into `manifest.json` and `pyproject.toml`; refreshes
   `uv.lock`; runs the full local gate; and opens a `chore: release v<version>`

@@ -14,7 +14,8 @@
 # `main` only accepts signed commits through reviewed PRs, and `just ci` is the
 # same gate GitHub Actions runs, so run it before every push.
 #
-# Shipping a release takes two steps, because main only accepts reviewed PRs:
+# Shipping a release takes two steps, run from an up-to-date main, because
+# main only accepts reviewed PRs:
 #
 #   just release-prepare 0.2.1   gate, bump the version, open the release PR
 #   (get the PR reviewed and merged)
@@ -192,7 +193,7 @@ lock:
 
 # Step 1 of 2: run the gate and open a PR bumping the version to VERSION.
 [group('release')]
-release-prepare version:
+release-prepare version: _require-main
     #!/usr/bin/env bash
     set -euo pipefail
     version="$(uv run python scripts/release_metadata.py normalize '{{ version }}')"
@@ -203,7 +204,6 @@ release-prepare version:
       echo "commit or stash your changes first; the release branch starts from origin/main" >&2
       exit 1
     fi
-    git fetch --quiet origin main --tags
     if git rev-parse -q --verify "refs/tags/$tag" >/dev/null \
       || git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
       echo "$tag is already tagged; pick a new version" >&2
@@ -261,7 +261,7 @@ release-prepare version:
 
 # Step 2 of 2, after the release PR merges: tag it and create the GitHub Release.
 [group('release')]
-release-publish version:
+release-publish version: _require-main
     #!/usr/bin/env bash
     set -euo pipefail
     version="$(uv run python scripts/release_metadata.py normalize '{{ version }}')"
@@ -328,3 +328,31 @@ release-publish version:
     echo
     echo "Next: replace the generated notes with a written summary (see AGENTS.md,"
     echo "\"HACS & Release Engineering\"): gh release edit $tag --notes-file notes.md"
+
+# Releases ship what is merged on main, and the recipes call scripts/ from the
+# checkout, so both steps start from a main that matches origin/main exactly.
+[private]
+_require-main:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    git fetch --quiet origin main --tags
+    branch="$(git branch --show-current)"
+    if [[ "$branch" != main ]]; then
+      echo "Releases run from main, but you're on ${branch:-a detached HEAD}. Run:" >&2
+      echo "  git switch main && git pull" >&2
+      echo "then rerun this command." >&2
+      exit 1
+    fi
+    read -r ahead behind < <(git rev-list --left-right --count HEAD...origin/main)
+    if [[ "$ahead" != 0 ]]; then
+      echo "Your main has $ahead commit(s) that aren't on origin/main, and releases" >&2
+      echo "only ship merged work. Move them to a branch and open a PR, or drop them:" >&2
+      echo "  git reset --keep origin/main" >&2
+      exit 1
+    fi
+    if [[ "$behind" != 0 ]]; then
+      echo "Your main is $behind commit(s) behind origin/main. Run:" >&2
+      echo "  git pull" >&2
+      echo "then rerun this command." >&2
+      exit 1
+    fi
