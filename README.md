@@ -322,9 +322,11 @@ estimated energy from sampled power readings.
 
 ## Release Engineering
 
-`just release <version>` is the canonical release path. It updates release
-metadata, runs the full local gate, creates a signed `v`-prefixed tag, pushes
-the branch and tag, and creates a GitHub Release for HACS.
+`just release <version>` is the canonical release path. `main` only accepts
+reviewed PRs, so it runs twice: the first run opens a PR that bumps the release
+metadata after the full local gate passes, and the second run, after that PR
+merges, creates a signed `v`-prefixed tag on the release commit and a GitHub
+Release for HACS. Run `just` for the full recipe list.
 
 After the release exists on GitHub, replace the generated release notes with a
 narrative release summary before announcing it. Start with a single top-level

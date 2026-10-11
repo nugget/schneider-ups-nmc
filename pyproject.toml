@@ -80,7 +80,7 @@ testpaths = ["tests"]
 python_files = ["test_homeassistant_*.py"]
 
 [tool.pyright]
-include = ["custom_components", "tests"]
+include = ["custom_components", "scripts", "tests"]
 pythonVersion = "3.14"
 typeCheckingMode = "standard"
 reportMissingImports = "none"
