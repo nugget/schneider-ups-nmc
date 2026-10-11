@@ -64,6 +64,7 @@
           "syslog_enabled": "Enable syslog listener",
           "syslog_bind_address": "Syslog bind address",
           "syslog_port": "Syslog UDP port",
+          "syslog_log_raw_messages": "Log received syslog messages",
           "web_url": "Web UI URL"
         }
       }

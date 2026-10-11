@@ -9,7 +9,7 @@ import re
 import socket
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -19,16 +19,16 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 DEFAULT_SYSLOG_BIND_ADDRESS = "0.0.0.0"
 DEFAULT_SYSLOG_ENABLED = True
+DEFAULT_SYSLOG_LOG_RAW_MESSAGES = False
 DEFAULT_SYSLOG_PORT = 1514
-RFC5424_RE = re.compile(
+RFC5424_HEADER_RE = re.compile(
     r"^<(?P<priority>\d+)>(?P<version>\d+) "
     r"(?P<timestamp>\S+) "
     r"(?P<hostname>\S+) "
     r"(?P<app_name>\S+) "
     r"(?P<proc_id>\S+) "
-    r"(?P<msg_id>\S+) "
-    r"(?P<structured_data>\S+) "
-    r"(?P<message>.*)$"
+    r"(?P<msg_id>\S+)"
+    r"(?: (?P<remainder>.*))?$"
 )
 RFC3164_RE = re.compile(
     r"^<(?P<priority>\d+)>(?P<timestamp>[A-Z][a-z]{2}\s+\d{1,2} "
@@ -82,6 +82,14 @@ class SyslogParseError(ValueError):
 
 
 @dataclass(frozen=True)
+class SyslogStructuredDataElement:
+    """A parsed RFC5424 structured data element."""
+
+    element_id: str
+    parameters: Mapping[str, str]
+
+
+@dataclass(frozen=True)
 class SyslogEvent:
     """A parsed NMC syslog event."""
 
@@ -97,6 +105,7 @@ class SyslogEvent:
     message: str
     event_category: str | None
     event_text: str
+    structured_data_elements: tuple[SyslogStructuredDataElement, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -129,6 +138,7 @@ class SyslogEventCoordinator(Protocol):
     """Coordinator protocol used by the syslog router."""
 
     host: str
+    syslog_log_raw_messages: bool
 
     async def async_handle_syslog_event(self, event: RoutedSyslogEvent) -> None:
         """Handle a routed syslog event."""
@@ -243,6 +253,18 @@ class SyslogPushManager:
         source_port: int,
     ) -> None:
         """Route a syslog datagram to the matching coordinator."""
+        coordinator = syslog_coordinator_for_source(
+            source_host,
+            self._coordinators_by_host,
+        )
+        if coordinator is not None and coordinator.syslog_log_raw_messages:
+            _LOGGER.info(
+                "Received syslog datagram from %s:%s: %s",
+                source_host,
+                source_port,
+                _syslog_datagram_log_text(raw),
+            )
+
         try:
             dispatch = route_syslog_datagram(
                 raw,
@@ -251,10 +273,6 @@ class SyslogPushManager:
                 coordinators_by_host=self._coordinators_by_host,
             )
         except SyslogParseError as err:
-            coordinator = syslog_coordinator_for_source(
-                source_host,
-                self._coordinators_by_host,
-            )
             if coordinator is not None:
                 coordinator.async_handle_syslog_parse_failure(
                     RoutedSyslogParseFailure(
@@ -310,12 +328,18 @@ def parse_syslog_message(raw: bytes | str) -> SyslogEvent:
     """Parse an NMC syslog message."""
     text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
     text = text.strip()
-    if match := RFC5424_RE.match(text):
+    if match := RFC5424_HEADER_RE.match(text):
         return _parse_rfc5424_match(match)
     if match := RFC3164_RE.match(text):
         return _parse_rfc3164_match(match)
 
     raise SyslogParseError("Unsupported syslog message format")
+
+
+def _syslog_datagram_log_text(raw: bytes) -> str:
+    """Return a syslog datagram as single-line text for explicit capture logging."""
+    text = raw.decode("utf-8", errors="backslashreplace")
+    return text.replace("\r", r"\r").replace("\n", r"\n")
 
 
 def _parse_rfc5424_match(match: re.Match[str]) -> SyslogEvent:
@@ -325,7 +349,9 @@ def _parse_rfc5424_match(match: re.Match[str]) -> SyslogEvent:
         timestamp = datetime.fromisoformat(match.group("timestamp"))
     except ValueError as err:
         raise SyslogParseError("Invalid RFC5424 syslog timestamp") from err
-    message = match.group("message")
+    structured_data, structured_data_elements, message = _parse_structured_data(
+        match.group("remainder") or ""
+    )
 
     return SyslogEvent(
         priority=priority,
@@ -336,11 +362,170 @@ def _parse_rfc5424_match(match: re.Match[str]) -> SyslogEvent:
         app_name=match.group("app_name"),
         proc_id=match.group("proc_id"),
         msg_id=match.group("msg_id"),
-        structured_data=match.group("structured_data"),
+        structured_data=structured_data,
         message=message,
         event_category=_event_category(match.group("proc_id"), match.group("msg_id")),
         event_text=message,
+        structured_data_elements=structured_data_elements,
     )
+
+
+def _parse_structured_data(
+    remainder: str,
+) -> tuple[str, tuple[SyslogStructuredDataElement, ...], str]:
+    """Split RFC5424 structured data from the message body."""
+    if not remainder:
+        return "-", (), ""
+
+    if remainder == "-":
+        return "-", (), ""
+    if remainder.startswith("- "):
+        return "-", (), remainder[2:]
+    if not remainder.startswith("["):
+        return "-", (), remainder
+
+    structured_end = _structured_data_end(remainder)
+    if structured_end is None:
+        raise SyslogParseError("Invalid RFC5424 structured data")
+
+    structured_data = remainder[:structured_end]
+    if structured_end == len(remainder):
+        message = ""
+    elif remainder[structured_end] == " ":
+        message = remainder[structured_end + 1 :]
+    else:
+        raise SyslogParseError("Invalid RFC5424 structured data")
+
+    return structured_data, _structured_data_elements(structured_data), message
+
+
+def _structured_data_end(text: str) -> int | None:
+    """Return the exclusive end index for one RFC5424 structured data value."""
+    if not text.startswith("["):
+        return None
+
+    index = 0
+    while index < len(text) and text[index] == "[":
+        element_end = _structured_data_element_end(text, index)
+        if element_end is None:
+            return None
+        index = element_end
+
+    return index
+
+
+def _structured_data_element_end(text: str, start: int) -> int | None:
+    """Return the exclusive end index for the SD-ELEMENT opening at ``start``.
+
+    A structured data value may hold several adjacent ``[...]`` elements, so
+    element iteration needs the end of exactly one element. The closing ``]``
+    only counts outside quoted parameter values and when not escaped.
+    """
+    index = start + 1
+    in_quote = False
+    escaped = False
+    while index < len(text):
+        char = text[index]
+        if escaped:
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == '"':
+            in_quote = not in_quote
+        elif char == "]" and not in_quote:
+            return index + 1
+        index += 1
+
+    return None
+
+
+def _structured_data_elements(
+    structured_data: str,
+) -> tuple[SyslogStructuredDataElement, ...]:
+    """Parse RFC5424 structured data elements."""
+    elements: list[SyslogStructuredDataElement] = []
+    index = 0
+    while index < len(structured_data):
+        if structured_data[index] != "[":
+            raise SyslogParseError("Invalid RFC5424 structured data")
+
+        element_end = _structured_data_element_end(structured_data, index)
+        if element_end is None:
+            raise SyslogParseError("Invalid RFC5424 structured data")
+
+        element_text = structured_data[index + 1 : element_end - 1]
+        elements.append(_structured_data_element(element_text))
+        index = element_end
+
+    return tuple(elements)
+
+
+def _structured_data_element(element_text: str) -> SyslogStructuredDataElement:
+    """Parse one RFC5424 structured data element."""
+    if not element_text:
+        raise SyslogParseError("Invalid RFC5424 structured data")
+
+    if " " in element_text:
+        element_id, parameters_text = element_text.split(" ", 1)
+    else:
+        element_id = element_text
+        parameters_text = ""
+
+    return SyslogStructuredDataElement(
+        element_id=element_id,
+        parameters=_structured_data_parameters(parameters_text),
+    )
+
+
+def _structured_data_parameters(parameters_text: str) -> dict[str, str]:
+    """Parse RFC5424 structured data parameters."""
+    parameters: dict[str, str] = {}
+    index = 0
+    while index < len(parameters_text):
+        while index < len(parameters_text) and parameters_text[index] == " ":
+            index += 1
+        if index == len(parameters_text):
+            break
+
+        name_start = index
+        while index < len(parameters_text) and parameters_text[index] != "=":
+            index += 1
+        if index == name_start or index == len(parameters_text):
+            raise SyslogParseError("Invalid RFC5424 structured data parameter")
+        name = parameters_text[name_start:index]
+
+        index += 1
+        if index == len(parameters_text) or parameters_text[index] != '"':
+            raise SyslogParseError("Invalid RFC5424 structured data parameter")
+        index += 1
+
+        value, index = _quoted_parameter_value(parameters_text, index)
+        parameters[name] = value
+
+        if index < len(parameters_text) and parameters_text[index] != " ":
+            raise SyslogParseError("Invalid RFC5424 structured data parameter")
+
+    return parameters
+
+
+def _quoted_parameter_value(text: str, index: int) -> tuple[str, int]:
+    """Return one quoted RFC5424 structured data parameter value."""
+    value: list[str] = []
+    escaped = False
+    while index < len(text):
+        char = text[index]
+        if escaped:
+            value.append(char)
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == '"':
+            return "".join(value), index + 1
+        else:
+            value.append(char)
+        index += 1
+
+    raise SyslogParseError("Invalid RFC5424 structured data parameter")
 
 
 def _parse_rfc3164_match(match: re.Match[str]) -> SyslogEvent:
@@ -436,10 +621,10 @@ def syslog_route_key(host: str) -> str:
     return str(address)
 
 
-def syslog_event_state_data(event: RoutedSyslogEvent) -> dict[str, int | str]:
+def syslog_event_state_data(event: RoutedSyslogEvent) -> dict[str, Any]:
     """Return Home Assistant event state data for a routed syslog event."""
     syslog_event = event.event
-    state_data: dict[str, int | str] = {
+    state_data: dict[str, Any] = {
         "source_host": event.source_host,
         "source_port": event.source_port,
         "priority": syslog_event.priority,
@@ -456,6 +641,14 @@ def syslog_event_state_data(event: RoutedSyslogEvent) -> dict[str, int | str]:
         state_data["category"] = syslog_event.event_category
     if syslog_event.structured_data != "-":
         state_data["structured_data"] = syslog_event.structured_data
+    if syslog_event.structured_data_elements:
+        state_data["structured_data_elements"] = [
+            {
+                "id": element.element_id,
+                "parameters": dict(element.parameters),
+            }
+            for element in syslog_event.structured_data_elements
+        ]
 
     return state_data
 

@@ -109,6 +109,7 @@ Options fields:
 - **Enable syslog listener**
 - **Syslog bind address**
 - **Syslog UDP port**
+- **Log received syslog messages**
 - **Web UI URL**
 
 The polling interval and syslog listener settings can be adjusted from options
@@ -243,6 +244,12 @@ Because Home Assistant only needs one local syslog socket for all configured UPS
 entries, every syslog-enabled entry should use the same listener settings. The
 listener can be disabled or moved to another bind address and UDP port from the
 integration options.
+
+For parser development or support captures, enable **Log received syslog
+messages** in the integration options. When enabled, the integration logs every
+syslog datagram received from that configured NMC source to the Home Assistant
+log. Leave this disabled during normal operation because syslog messages can
+include local operational details such as usernames, hostnames, and event text.
 
 If the listener cannot bind its configured address and port, if two
 syslog-enabled entries request different listener settings, or if a configured
