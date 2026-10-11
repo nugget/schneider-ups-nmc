@@ -3,9 +3,8 @@ name = "schneider-ups-nmc"
 version = "0.1.3"
 description = "Home Assistant custom integration for APC by Schneider Electric UPS Network Management Card devices."
 readme = "README.md"
-requires-python = ">=3.13.2"
+requires-python = ">=3.14.2"
 dependencies = [
-    "cryptography>=42.0.0,<49.0.0",
     "pysnmp==7.1.27",
 ]
 
@@ -14,14 +13,14 @@ dev = [
     "codespell>=2.4.0,<3.0.0",
     "pydoclint>=0.6.0,<1.0.0",
     "pyright>=1.1.400,<2.0.0",
-    "pytest-homeassistant-custom-component==0.13.316",
+    "pytest-homeassistant-custom-component==0.13.371",
     "ruff>=0.13.0,<1.0.0",
     "yamllint>=1.37.0,<2.0.0",
 ]
 
 [tool.ruff]
 line-length = 88
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [
@@ -82,7 +81,7 @@ python_files = ["test_homeassistant_*.py"]
 
 [tool.pyright]
 include = ["custom_components", "tests"]
-pythonVersion = "3.13"
+pythonVersion = "3.14"
 typeCheckingMode = "standard"
 reportMissingImports = "none"
 reportUnknownArgumentType = "none"

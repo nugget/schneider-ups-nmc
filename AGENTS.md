@@ -47,7 +47,7 @@ catch what could have been caught locally.
 
 ## Code Conventions
 
-- **Python 3.13+** required.
+- **Python 3.14+** required (matches Home Assistant 2026.10).
 - **Conventional commits**: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`,
   `chore:`.
 - **Prefer the standard library and Home Assistant helpers**. Add third-party
