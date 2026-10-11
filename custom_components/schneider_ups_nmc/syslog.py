@@ -401,31 +401,40 @@ def _parse_structured_data(
 
 def _structured_data_end(text: str) -> int | None:
     """Return the exclusive end index for one RFC5424 structured data value."""
+    if not text.startswith("["):
+        return None
+
     index = 0
-    while index < len(text):
-        if text[index] != "[":
-            return index if index else None
-
-        index += 1
-        in_quote = False
-        escaped = False
-        while index < len(text):
-            char = text[index]
-            if escaped:
-                escaped = False
-            elif char == "\\":
-                escaped = True
-            elif char == '"':
-                in_quote = not in_quote
-            elif char == "]" and not in_quote:
-                index += 1
-                break
-            index += 1
-        else:
+    while index < len(text) and text[index] == "[":
+        element_end = _structured_data_element_end(text, index)
+        if element_end is None:
             return None
+        index = element_end
 
-        if index == len(text) or text[index] != "[":
-            return index
+    return index
+
+
+def _structured_data_element_end(text: str, start: int) -> int | None:
+    """Return the exclusive end index for the SD-ELEMENT opening at ``start``.
+
+    A structured data value may hold several adjacent ``[...]`` elements, so
+    element iteration needs the end of exactly one element. The closing ``]``
+    only counts outside quoted parameter values and when not escaped.
+    """
+    index = start + 1
+    in_quote = False
+    escaped = False
+    while index < len(text):
+        char = text[index]
+        if escaped:
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == '"':
+            in_quote = not in_quote
+        elif char == "]" and not in_quote:
+            return index + 1
+        index += 1
 
     return None
 
@@ -440,13 +449,13 @@ def _structured_data_elements(
         if structured_data[index] != "[":
             raise SyslogParseError("Invalid RFC5424 structured data")
 
-        element_end = _structured_data_end(structured_data[index:])
+        element_end = _structured_data_element_end(structured_data, index)
         if element_end is None:
             raise SyslogParseError("Invalid RFC5424 structured data")
 
-        element_text = structured_data[index + 1 : index + element_end - 1]
+        element_text = structured_data[index + 1 : element_end - 1]
         elements.append(_structured_data_element(element_text))
-        index += element_end
+        index = element_end
 
     return tuple(elements)
 

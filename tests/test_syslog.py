@@ -101,6 +101,65 @@ class ParseSyslogMessageTest(unittest.TestCase):
         )
         self.assertEqual(event.event_text, "Probe metadata changed")
 
+    def test_parses_rfc5424_multiple_structured_data_elements(self) -> None:
+        """Parse adjacent structured data elements as separate elements."""
+        cases = (
+            (
+                "two elements with parameters",
+                '[meta sequenceId="7"][origin ip="192.0.2.10"]',
+                (
+                    syslog.SyslogStructuredDataElement(
+                        element_id="meta",
+                        parameters={"sequenceId": "7"},
+                    ),
+                    syslog.SyslogStructuredDataElement(
+                        element_id="origin",
+                        parameters={"ip": "192.0.2.10"},
+                    ),
+                ),
+            ),
+            (
+                "element without parameters before another element",
+                '[flag][meta sysUpTime="6441"]',
+                (
+                    syslog.SyslogStructuredDataElement(
+                        element_id="flag",
+                        parameters={},
+                    ),
+                    syslog.SyslogStructuredDataElement(
+                        element_id="meta",
+                        parameters={"sysUpTime": "6441"},
+                    ),
+                ),
+            ),
+            (
+                "closing bracket inside quoted value",
+                '[probe name="Rack ] Top"][meta sequenceId="8"]',
+                (
+                    syslog.SyslogStructuredDataElement(
+                        element_id="probe",
+                        parameters={"name": "Rack ] Top"},
+                    ),
+                    syslog.SyslogStructuredDataElement(
+                        element_id="meta",
+                        parameters={"sequenceId": "8"},
+                    ),
+                ),
+            ),
+        )
+
+        for name, structured_data, expected_elements in cases:
+            with self.subTest(name):
+                event = syslog.parse_syslog_message(
+                    "<14>1 2026-05-26T16:59:45-05:00 "
+                    f"ups.example.test su_v2.5.5.1 Device 0x1234 "
+                    f"{structured_data} Probe metadata changed"
+                )
+
+                self.assertEqual(event.structured_data, structured_data)
+                self.assertEqual(event.structured_data_elements, expected_elements)
+                self.assertEqual(event.event_text, "Probe metadata changed")
+
     def test_parses_rfc5424_messages_without_structured_data(self) -> None:
         """Accept RFC5424-like NMC messages that omit structured data."""
         event = syslog.parse_syslog_message(
