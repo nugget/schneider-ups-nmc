@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from homeassistant import config_entries
@@ -41,12 +41,24 @@ from custom_components.schneider_ups_nmc.snmp import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from homeassistant.core import HomeAssistant
 
 
 pytestmark = pytest.mark.usefixtures("enable_custom_integrations")
 
 INTEGRATION_DIR = Path(__file__).parents[1] / "custom_components/schneider_ups_nmc"
+
+
+@pytest.fixture(autouse=True)
+def mock_setup_entry() -> Iterator[AsyncMock]:
+    """Keep flow-created entries from polling a real NMC over SNMP."""
+    with patch(
+        "custom_components.schneider_ups_nmc.async_setup_entry",
+        return_value=True,
+    ) as setup_entry:
+        yield setup_entry
 
 
 async def test_snmpv2c_config_flow_creates_entry(

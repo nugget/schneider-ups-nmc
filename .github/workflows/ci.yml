@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   ci:
-    name: Python 3.13
+    name: Python 3.14
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -22,7 +22,7 @@ jobs:
         uses: astral-sh/setup-uv@v8.1.0
         with:
           enable-cache: true
-          python-version: "3.13"
+          python-version: "3.14"
 
       - name: Set up just
         uses: taiki-e/install-action@just

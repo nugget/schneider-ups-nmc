@@ -6,7 +6,7 @@ import logging
 from ipaddress import ip_address
 from typing import TYPE_CHECKING, Any
 
-import voluptuous as vol
+import probatio
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
 from homeassistant.core import callback
@@ -212,10 +212,10 @@ class SchneiderUPSNMCConfigFlow(  # pyright: ignore[reportGeneralTypeIssues]
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
+        config_entry: config_entries.ConfigEntry,  # noqa: ARG004
     ) -> SchneiderUPSNMCOptionsFlow:
         """Create the options flow."""
-        return SchneiderUPSNMCOptionsFlow(config_entry)
+        return SchneiderUPSNMCOptionsFlow()
 
     async def _async_validate_input(self, data: dict[str, Any]) -> dict[str, str]:
         """Validate the user input by querying the UPS."""
@@ -273,10 +273,6 @@ class SchneiderUPSNMCConfigFlow(  # pyright: ignore[reportGeneralTypeIssues]
 class SchneiderUPSNMCOptionsFlow(config_entries.OptionsFlow):
     """Handle options for APC UPS NMC."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize the options flow."""
-        self._config_entry = config_entry
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -290,8 +286,8 @@ class SchneiderUPSNMCOptionsFlow(config_entries.OptionsFlow):
                 return self.async_create_entry(title="", data=options)
 
         defaults = (
-            dict(self._config_entry.data)
-            | dict(self._config_entry.options)
+            dict(self.config_entry.data)
+            | dict(self.config_entry.options)
             | dict(user_input or {})
         )
         scan_interval = defaults.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
@@ -308,9 +304,9 @@ class SchneiderUPSNMCOptionsFlow(config_entries.OptionsFlow):
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
+            data_schema=probatio.Schema(
                 {
-                    vol.Required(
+                    probatio.Required(
                         CONF_SCAN_INTERVAL, default=scan_interval
                     ): NumberSelector(
                         NumberSelectorConfig(
@@ -320,12 +316,14 @@ class SchneiderUPSNMCOptionsFlow(config_entries.OptionsFlow):
                             unit_of_measurement="seconds",
                         )
                     ),
-                    vol.Required(CONF_SYSLOG_ENABLED, default=syslog_enabled): bool,
-                    vol.Required(
+                    probatio.Required(
+                        CONF_SYSLOG_ENABLED, default=syslog_enabled
+                    ): bool,
+                    probatio.Required(
                         CONF_SYSLOG_BIND_ADDRESS,
                         default=syslog_bind_address,
                     ): str,
-                    vol.Required(
+                    probatio.Required(
                         CONF_SYSLOG_PORT,
                         default=syslog_port,
                     ): NumberSelector(
@@ -335,7 +333,7 @@ class SchneiderUPSNMCOptionsFlow(config_entries.OptionsFlow):
                             mode=NumberSelectorMode.BOX,
                         )
                     ),
-                    vol.Required(
+                    probatio.Required(
                         CONF_SYSLOG_LOG_RAW_MESSAGES,
                         default=syslog_log_raw_messages,
                     ): bool,
@@ -346,10 +344,10 @@ class SchneiderUPSNMCOptionsFlow(config_entries.OptionsFlow):
         )
 
 
-def _base_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
+def _base_schema(defaults: Mapping[str, Any] | None = None) -> probatio.Schema:
     """Build the shared UPS connection schema."""
     defaults = defaults or {}
-    return vol.Schema(
+    return probatio.Schema(
         {
             _required(CONF_HOST, defaults): str,
             _required(CONF_PORT, defaults, DEFAULT_PORT): int,
@@ -379,18 +377,18 @@ def _base_schema(defaults: Mapping[str, Any] | None = None) -> vol.Schema:
     )
 
 
-def _snmpv2c_schema(defaults: Mapping[str, Any]) -> vol.Schema:
+def _snmpv2c_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
     """Build the SNMPv2c credential schema."""
-    return vol.Schema(
+    return probatio.Schema(
         {
             _required(CONF_COMMUNITY, defaults, "public"): _password_selector(),
         }
     )
 
 
-def _snmpv3_schema(defaults: Mapping[str, Any]) -> vol.Schema:
+def _snmpv3_schema(defaults: Mapping[str, Any]) -> probatio.Schema:
     """Build the SNMPv3 credential schema."""
-    return vol.Schema(
+    return probatio.Schema(
         {
             _required(CONF_USERNAME, defaults): str,
             _required(CONF_AUTH_PROTOCOL, defaults, AUTH_PROTOCOL_SHA): SelectSelector(
@@ -471,28 +469,28 @@ def _normalize_syslog_bind_address_input(data: dict[str, Any]) -> dict[str, str]
 def _required(
     key: str,
     defaults: Mapping[str, Any],
-    fallback: Any = vol.UNDEFINED,
+    fallback: Any = probatio.UNDEFINED,
 ) -> Any:
-    """Return a required voluptuous marker with a default when available."""
+    """Return a required schema marker with a default when available."""
     if key in defaults:
-        return vol.Required(key, default=defaults[key])
-    if fallback is not vol.UNDEFINED:
-        return vol.Required(key, default=fallback)
-    return vol.Required(key)
+        return probatio.Required(key, default=defaults[key])
+    if fallback is not probatio.UNDEFINED:
+        return probatio.Required(key, default=fallback)
+    return probatio.Required(key)
 
 
 def _optional(key: str, defaults: Mapping[str, Any]) -> Any:
-    """Return an optional voluptuous marker with a default when available."""
+    """Return an optional schema marker with a default when available."""
     if key in defaults:
-        return vol.Optional(key, default=defaults[key])
-    return vol.Optional(key)
+        return probatio.Optional(key, default=defaults[key])
+    return probatio.Optional(key)
 
 
 def _optional_web_url(defaults: Mapping[str, Any]) -> Any:
     """Return an optional web URL marker with a useful default."""
     if defaults.get(CONF_WEB_URL):
-        return vol.Optional(CONF_WEB_URL, default=defaults[CONF_WEB_URL])
-    return vol.Optional(CONF_WEB_URL)
+        return probatio.Optional(CONF_WEB_URL, default=defaults[CONF_WEB_URL])
+    return probatio.Optional(CONF_WEB_URL)
 
 
 def _entry_data(data: Mapping[str, Any]) -> dict[str, Any]:

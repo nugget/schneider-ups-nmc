@@ -8,6 +8,10 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+import homeassistant
+from packaging.requirements import Requirement
+from packaging.utils import canonicalize_name
+
 ROOT = Path(__file__).resolve().parents[1]
 DOMAIN = "schneider_ups_nmc"
 PACKAGE_NAME = "schneider-ups-nmc"
@@ -59,6 +63,27 @@ class RepositoryMetadataTest(unittest.TestCase):
             "https://github.com/nugget/schneider-ups-nmc/issues",
         )
 
+    def test_manifest_requirements_fit_home_assistant_constraints(self) -> None:
+        """Reject requirements that conflict with Home Assistant's own pins.
+
+        Home Assistant refuses to set up an integration whose requirements
+        cannot be installed alongside the versions it pins in
+        ``package_constraints.txt``, so a stale upper bound becomes a
+        production setup failure on the next core upgrade.
+        """
+        constraints = _home_assistant_pins()
+
+        for requirement_text in _manifest()["requirements"]:
+            requirement = Requirement(requirement_text)
+            pinned = constraints.get(canonicalize_name(requirement.name))
+            if pinned is None:
+                continue
+            with self.subTest(requirement_text):
+                self.assertTrue(
+                    requirement.specifier.contains(pinned, prereleases=True),
+                    f"Home Assistant pins {requirement.name}=={pinned}",
+                )
+
 
 def _manifest() -> dict[str, Any]:
     """Return the integration manifest."""
@@ -87,6 +112,21 @@ def _lock_package() -> dict[str, Any]:
             return package
 
     raise AssertionError(f"{PACKAGE_NAME} is missing from uv.lock")
+
+
+def _home_assistant_pins() -> dict[str, str]:
+    """Return the exact package pins from Home Assistant's package_constraints.txt."""
+    constraints_path = Path(homeassistant.__file__).with_name("package_constraints.txt")
+    pins: dict[str, str] = {}
+    for line in constraints_path.read_text(encoding="utf-8").splitlines():
+        text = line.split("#", 1)[0].strip()
+        if not text:
+            continue
+        requirement = Requirement(text)
+        specifiers = list(requirement.specifier)
+        if len(specifiers) == 1 and specifiers[0].operator == "==":
+            pins[canonicalize_name(requirement.name)] = specifiers[0].version
+    return pins
 
 
 if __name__ == "__main__":

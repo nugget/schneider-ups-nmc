@@ -874,7 +874,7 @@ def _coerce_snmp_value(value: Any) -> int | str | None:
 
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return pretty
 
 
@@ -1027,7 +1027,7 @@ def _int(value: Any) -> int | None:
 
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
