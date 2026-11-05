@@ -1,6 +1,6 @@
 # APC UPS NMC
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square)](https://www.hacs.xyz/)
+[![Marketplace custom repository](https://img.shields.io/badge/Marketplace-custom%20repository-41BDF5.svg?style=flat-square)](https://www.home-assistant.io/integrations/marketplace/)
 [![CI](https://img.shields.io/github/actions/workflow/status/nugget/schneider-ups-nmc/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/nugget/schneider-ups-nmc/actions/workflows/ci.yml)
 [![Manifest version](https://img.shields.io/badge/dynamic/json?style=flat-square&label=manifest&query=%24.version&url=https%3A%2F%2Fraw.githubusercontent.com%2Fnugget%2Fschneider-ups-nmc%2Fmain%2Fcustom_components%2Fschneider_ups_nmc%2Fmanifest.json)](https://github.com/nugget/schneider-ups-nmc/blob/main/custom_components/schneider_ups_nmc/manifest.json)
 [![Release](https://img.shields.io/github/v/release/nugget/schneider-ups-nmc?style=flat-square&label=release)](https://github.com/nugget/schneider-ups-nmc/releases)
@@ -42,7 +42,8 @@ matches what the card actually reports.
 
 ## Requirements
 
-- Home Assistant 2026.10.0 or newer with HACS installed.
+- Home Assistant 2026.10.0 or newer. Install through the Marketplace on
+  2026.11 and later, or through HACS on 2026.10.
 - An APC by Schneider Electric UPS with a supported Network Management Card.
 - SNMP enabled on the NMC web or CLI interface.
 - Either SNMPv2c read-only community access or SNMPv3 credentials.
@@ -52,9 +53,11 @@ the NMC access control list to your Home Assistant host.
 
 ## Installation
 
-1. Add this repository as a custom integration repository in HACS.
+1. In **Settings > Marketplace** (HACS before 2026.11), add this repository as a
+   custom repository of type *Integration*.
 2. Install **APC UPS NMC**.
-3. Restart Home Assistant.
+3. Restart Home Assistant if asked. A first install from the Marketplace needs
+   no restart; updates, and installs through HACS, do.
 4. Go to **Settings > Devices & services > Add integration**.
 5. Search for **APC UPS NMC**.
 6. Enter the NMC host, SNMP port, SNMP version, scan interval, and optional web
@@ -318,7 +321,8 @@ estimated energy from sampled power readings.
 3. Delete each config entry you no longer want.
 4. Remove or disable the matching syslog destination on the NMC if you enabled
    syslog push events.
-5. Optionally uninstall the integration from HACS and restart Home Assistant.
+5. Optionally uninstall the integration from the Marketplace (HACS on older
+   Home Assistant) and restart Home Assistant.
 
 ## Release Engineering
 
@@ -326,7 +330,7 @@ Releases take two steps because `main` only accepts reviewed PRs.
 `just release-prepare <version>` runs the full local gate and opens a PR that
 bumps the release metadata. After that PR merges, `just release-publish
 <version>` creates a signed `v`-prefixed tag on the release commit and a GitHub
-Release for HACS. Run `just` for the full recipe list.
+Release for the Marketplace. Run `just` for the full recipe list.
 
 After the release exists on GitHub, replace the generated release notes with a
 narrative release summary before announcing it. Start with a single top-level
