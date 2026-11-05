@@ -11,6 +11,7 @@ from typing import Any
 import homeassistant
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
+from packaging.version import Version
 
 ROOT = Path(__file__).resolve().parents[1]
 DOMAIN = "schneider_ups_nmc"
@@ -38,8 +39,24 @@ class RepositoryMetadataTest(unittest.TestCase):
         pyproject = _pyproject()
         lock_package = _lock_package()
 
-        self.assertEqual(manifest["version"], pyproject["project"]["version"])
-        self.assertEqual(manifest["version"], lock_package["version"])
+        # uv.lock stores the PEP 440 normal form (0.3.0rc1), while the manifest
+        # and pyproject keep the release spelling (0.3.0-rc.1), so compare
+        # versions rather than strings.
+        version = Version(manifest["version"])
+        self.assertEqual(version, Version(pyproject["project"]["version"]))
+        self.assertEqual(version, Version(lock_package["version"]))
+
+    def test_english_translation_is_literal(self) -> None:
+        """Ship no ``[%key:…%]`` references; custom integrations never resolve them.
+
+        Home Assistant resolves those references only when building core
+        integrations, so in a custom integration users see the raw reference
+        text in place of the label.
+        """
+        english = ROOT.joinpath(
+            "custom_components", DOMAIN, "translations", "en.json"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("[%key", english)
 
     def test_manifest_matches_project_metadata(self) -> None:
         """Keep manifest metadata aligned with repository packaging."""
