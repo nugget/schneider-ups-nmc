@@ -15,11 +15,11 @@
       "reconfigure": {
         "title": "Reconfigure UPS network management card",
         "data": {
-          "host": "[%key:component::schneider_ups_nmc::config::step::user::data::host%]",
-          "port": "[%key:component::schneider_ups_nmc::config::step::user::data::port%]",
-          "snmp_version": "[%key:component::schneider_ups_nmc::config::step::user::data::snmp_version%]",
-          "scan_interval": "[%key:component::schneider_ups_nmc::config::step::user::data::scan_interval%]",
-          "web_url": "[%key:component::schneider_ups_nmc::config::step::user::data::web_url%]"
+          "host": "Host",
+          "port": "Port",
+          "snmp_version": "SNMP version",
+          "scan_interval": "Scan interval",
+          "web_url": "Web UI URL"
         }
       },
       "snmpv2c": {
@@ -82,9 +82,9 @@
             "title": "Update syslog listener settings",
             "description": "Choose syslog listener settings for {name}. This entry requested {requested}, but the shared listener is already using {active}. Use matching listener settings for all syslog-enabled UPS entries, or disable syslog for this entry.",
             "data": {
-              "syslog_enabled": "[%key:component::schneider_ups_nmc::options::step::init::data::syslog_enabled%]",
-              "syslog_bind_address": "[%key:component::schneider_ups_nmc::options::step::init::data::syslog_bind_address%]",
-              "syslog_port": "[%key:component::schneider_ups_nmc::options::step::init::data::syslog_port%]"
+              "syslog_enabled": "Enable syslog listener",
+              "syslog_bind_address": "Syslog bind address",
+              "syslog_port": "Syslog UDP port"
             }
           }
         }
@@ -99,9 +99,9 @@
             "title": "Update syslog listener settings",
             "description": "Choose syslog listener settings for {name}. The listener could not start on {address}: {error}. Change the bind address or UDP port, free the port, or disable syslog for this entry.",
             "data": {
-              "syslog_enabled": "[%key:component::schneider_ups_nmc::options::step::init::data::syslog_enabled%]",
-              "syslog_bind_address": "[%key:component::schneider_ups_nmc::options::step::init::data::syslog_bind_address%]",
-              "syslog_port": "[%key:component::schneider_ups_nmc::options::step::init::data::syslog_port%]"
+              "syslog_enabled": "Enable syslog listener",
+              "syslog_bind_address": "Syslog bind address",
+              "syslog_port": "Syslog UDP port"
             }
           }
         }
