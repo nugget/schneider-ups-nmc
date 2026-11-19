@@ -332,13 +332,11 @@ bumps the release metadata. After that PR merges, `just release-publish
 <version>` creates a signed `v`-prefixed tag on the release commit and a GitHub
 Release for the Marketplace. Run `just` for the full recipe list.
 
-After the release exists on GitHub, replace the generated release notes with a
-narrative release summary before announcing it. Start with a single top-level
-`#` heading that describes the scope and spirit of the release rather than
-repeating the tag. Let that heading set the tone; personality is welcome when it
-helps the release feel written by humans. Explain why the release matters to
-Home Assistant users, group changes by user impact, and keep PR links or the
-full changelog as supporting detail rather than the whole story.
+After publishing, replace the generated GitHub release notes with a concise
+summary that fits the Marketplace and HACS update dialogs. Open with a short,
+descriptive `###` heading. Lead with what changes for users and any action they
+need to take, then cover compatibility and other details in order of importance.
+Close with a link to the full changelog.
 
 ## License
 
