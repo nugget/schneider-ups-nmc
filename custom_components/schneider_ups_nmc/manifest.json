@@ -2,10 +2,16 @@
   "domain": "schneider_ups_nmc",
   "name": "APC UPS NMC",
   "after_dependencies": [],
+  "categories": [
+    "energy.backup_power"
+  ],
   "codeowners": [
     "@nugget"
   ],
   "config_flow": true,
+  "connectivity": [
+    "network"
+  ],
   "documentation": "https://github.com/nugget/schneider-ups-nmc",
   "integration_type": "device",
   "iot_class": "local_polling",

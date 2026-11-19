@@ -4,11 +4,12 @@ APC UPS NMC is a Home Assistant custom integration for APC by Schneider Electric
 UPS Network Management Card devices. The first support target is NMC3 hardware,
 but the repository and Home Assistant domain intentionally leave room for other
 Schneider Electric/APC NMC generations. The release artifact is a
-HACS-installable repository containing one integration under
+repository installable from the Home Assistant Marketplace (HACS before
+2026.11), containing one integration under
 `custom_components/schneider_ups_nmc/`.
 
 This repo should feel like a Home Assistant Core integration even while it is
-distributed through HACS. Aim for Home Assistant's Integration Quality Scale,
+distributed through the Marketplace. Aim for Home Assistant's Integration Quality Scale,
 with platinum as the north star: excellent user experience, strict code
 quality, robust diagnostics, thoughtful documentation, and efficient local
 communication.
@@ -166,19 +167,28 @@ without updating affected docs, docstrings, translations, or diagnostics is
 incomplete in the same way a PR that changes behavior without updating tests is
 incomplete.
 
-## HACS & Release Engineering
+## Marketplace & Release Engineering
 
-- Keep exactly one integration under `custom_components/` for HACS.
+- Home Assistant 2026.11 built HACS into core as the Marketplace. It still reads
+  `hacs.json` and the same `hacs/default` catalog, takes versions from
+  published GitHub Releases, and installs custom repositories added by link, so
+  the repository layout is unchanged. It reads only these `hacs.json` keys:
+  `content_in_root`, `filename`, `hacs`, `hide_default_branch`,
+  `homeassistant`, `name`, `persistent_directory`, `zip_release`. It does not
+  use `info.md` or `render_readme`.
+- Keep exactly one integration under `custom_components/` for the Marketplace.
 - All runtime files required by Home Assistant belong inside
   `custom_components/schneider_ups_nmc/`.
 - Keep `manifest.json`, `hacs.json`, `README.md`, translations, and brand assets
   aligned with each release.
 - `manifest.json` must include clear ownership, documentation, issue tracker,
-  integration type, IoT class, requirements, and version metadata.
+  integration type, IoT class, requirements, and version metadata, plus the
+  2026.11 `categories` (primary first) and `connectivity` keys. Their
+  vocabulary lives in core's `homeassistant/components/homeassistant/strings.json`.
 - Release tags are semver tags with a leading `v`, such as `v0.1.0` or
   `v0.1.0-rc.1`.
-- Prefer GitHub releases for user-facing HACS installs and upgrades once the
-  integration is ready for users.
+- Prefer GitHub releases for user-facing Marketplace installs and upgrades once
+  the integration is ready for users.
 - Releases take two explicit steps because `main` only accepts signed commits
   through reviewed PRs. Run both from a `main` that matches `origin/main`;
   anywhere else they exit with the commands to get there.
@@ -190,7 +200,7 @@ incomplete.
   the PR merges, `just release-publish <version>` finds the commit on
   `origin/main` that set the version (not the tip of `main`), checks its GitHub
   checks are green, pushes a signed `v`-prefixed tag such as `v0.1.0`, and
-  creates the GitHub Release so HACS sees it as a release. Each step refuses
+  creates the GitHub Release so the Marketplace offers it. Each step refuses
   with a pointer to the right one when run at the wrong time. Both accept
   either `0.1.0` or `v0.1.0` and normalize the two release surfaces.
 - When Home Assistant ships a release, run `just ha-drift`. It exits non-zero

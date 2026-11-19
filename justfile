@@ -1,4 +1,5 @@
-# APC UPS NMC: Home Assistant custom integration, shipped through HACS.
+# APC UPS NMC: Home Assistant custom integration, shipped through the
+# Home Assistant Marketplace (formerly HACS).
 #
 # New here, or back after a long time? Run `just` to see every recipe, then:
 #
@@ -133,9 +134,9 @@ typecheck:
 # Catch typos in code and docs.
 [group('checks')]
 spellcheck:
-    uv run codespell --ignore-words-list hass AGENTS.md README.md info.md custom_components tests scripts hacs.json justfile pyproject.toml .github/workflows
+    uv run codespell --ignore-words-list hass AGENTS.md README.md custom_components tests scripts hacs.json justfile pyproject.toml .github/workflows
 
-# Validate the JSON that Home Assistant and HACS load.
+# Validate the JSON that Home Assistant and the Marketplace load.
 [group('checks')]
 json:
     uv run python -m json.tool {{ manifest }} > /dev/null
@@ -182,7 +183,7 @@ ha-upgrade harness="latest":
     echo "Harness $harness runs Home Assistant" \
       "$(uv run python -c 'from importlib.metadata import version; print(version("homeassistant"))')."
     echo "Next: just ci, fix what the new core breaks, and decide whether"
-    echo "hacs.json \"homeassistant\" (the minimum HACS will install on) must move too."
+    echo "hacs.json \"homeassistant\" (the minimum the Marketplace will install on) must move too."
 
 # Refresh uv.lock after editing dependencies in pyproject.toml.
 [group('dependencies')]
@@ -266,7 +267,7 @@ release-publish version: _require-main
     set -euo pipefail
     version="$(uv run python scripts/release_metadata.py normalize '{{ version }}')"
     tag="v$version"
-    # Pre-releases (0.3.0-rc.1) must not become the release HACS installs.
+    # Pre-releases (0.3.0-rc.1) must not become the release the Marketplace installs.
     kind="--latest"
     if [[ "$version" == *-* ]]; then
       kind="--prerelease"
@@ -328,7 +329,7 @@ release-publish version: _require-main
     gh release create "$tag" --verify-tag --title "$tag" --generate-notes "$kind"
     echo
     echo "Next: replace the generated notes with a written summary (see AGENTS.md,"
-    echo "\"HACS & Release Engineering\"): gh release edit $tag --notes-file notes.md"
+    echo "\"Marketplace & Release Engineering\"): gh release edit $tag --notes-file notes.md"
 
 # Releases ship what is merged on main, and the recipes call scripts/ from the
 # checkout, so both steps start from a main that matches origin/main exactly.
